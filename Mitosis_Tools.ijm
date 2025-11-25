@@ -1,22 +1,23 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //A simple tool to aid in the manual tracking of fluorescently labeled cells through mitosis and in the processing of the tracking data
+//This version of the macro toolset has been adapted to calculate cytoplasmic-to-nuclear intensity ratios for each user-defined X–Y position
 //The cells/objects are tracked in relation to a defined targetROI (e.g. A Hair Follicle Condensate)
-//Installation: Place Mitosis_Tools.ijm in /fiji/macros/toolsets and restart
+//Installation: Place Cyto_Nuc_Analysis.ijm in /fiji/macros/toolsets and restart
 //Results are recorded in the same format as the manual tracking tool (http://rsbweb.nih.gov/ij/plugins/track/track.html)
 //THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND - please refer to the separate license 
 
 //Tracking:
 
-//	Initialize Action Tool - Initializes the tracking. Specifies the future follicle condensate.
+//	Initialize Action Tool - Initializes the tracking. Specifies the position of the traget ROI.
 //	Manual Track Tool - Allows manual tracking of individual cells
 //	Adding a track changes the source number 1, 2, 3, 4 etc use this to start tracking a mother
-//	Adding a mitosis splits the track into daughters a and b (1a, 1b,does not yet support multiple mitoses)
-//	Switch Daughter to finsh tracking daughter a and start tracking daughter b
+//	Adding a mitosis splits the track into daughters a and b (1a, 1b, does not yet support multiple mitoses)
+//	Switch Daughter to finish tracking daughter a and start tracking daughter b
 
 //Processing:
 
 //	Add Summary Stats Action Tool 	- Summarises the tracking data in the same results table
-//	Align Tracks Action Tool 		- Aligns tracks in the log with the mitosis point at 0 - mothers behind and daughters ahead RUM SUMMARY STATS FIRST
+//	Align Tracks Action Tool 	- Aligns tracks in the log with the mitosis point at 0 - mothers behind and daughters ahead RUN SUMMARY STATS FIRST.
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,29 +26,30 @@ var gtrack = 1;
 var number = 1;
 
 //Global variables for mitosis tracking
-var is_seed = true;//are we on a seed track or a daughter track?
-var daughter = "";//this is either a or b and is appended to gtrack in the results table
-var mitosis_frame = "";//remember when the mitosis happened so we can go back to track the second daughter
-var mitosis_x = 0; //remember where the mitosis happened so we can go back to track the second daughter
-var mitosis_y = 0; //remember where the mitosis happened so we can go back to track the second daughter
-var mitosis = "";//string to print to table
-var last_line = "";//keep record of last entry in table
-var posx = 0;//position you click
-var posy = 0;//position you click
+var is_mother = true;   	// are we on a mother track or a daughter track?
+var daughter = "";     		// this is either a or b and is appended to gtrack in the results table
+var mitosis_frame = ""; 	// remember when the mitosis happened so we can go back to track the second daughter
+var mitosis_x = 0;     		// remember where the mitosis happened so we can go back to track the second daughter
+var mitosis_y = 0;     		// remember where the mitosis happened so we can go back to track the second daughter
+var mitosis = "";      		// string to print to table
+var last_line = "";    		// keep record of last entry in table
+var posx = 0;          		// position you click
+var posy = 0;          		// position you click
 
 //Global calibration variables
-var time_step = 10;//this is the image acquisition rate in minutes
-var cal = 0.619;//This is the resolution of the image in micron/px
+var time_step = 10;    // this is the image acquisition rate in minutes
+var cal = 0.619;       // this is the resolution of the image in micron/px
 
 //Global variables for ROI tracking
+var track_roi = false;
 var shortest = 100000;
-var	xpoints = newArray();//the extent of the ROI
-var ypoints = newArray();//the extent of the ROI
+var xpoints = newArray(); // the extent of the ROI
+var ypoints = newArray(); // the extent of the ROI
 
 var f = "";
 
 var count = 1;
-var Image = "";
+var image = "";         // image title (was 'Image' – avoid conflict with ImageJ keyword)
 var x_values = newArray();
 var y_values = newArray();
 var roi_n = 0;
@@ -55,138 +57,173 @@ var com_roi_x = 0;
 var com_roi_y = 0; 
 
 var sample = 5;
-var Image = "";
 var dir = "";
 var tdir = getDirectory("temp");
-	
+
+// --- NEW: N/C-related globals ---
+var bandWidth = 3;      // thickness of cytoplasmic band in pixels
+var nuc_mean = NaN;     // nuclear mean intensity
+var cyto_mean = NaN;    // cytoplasmic band mean intensity
+var nc_ratio = NaN;     // N/C ratio
+
 var angle = 0;
 var euc_dis = 0;
-var step = 6;//the size of the window in time steps
+var step = 6;           // the size of the window in time steps
 var rcells = false;
 var dCmds = newMenu("Data Operations Menu Tool", newArray("Add Summary Stats", "Align Tracks"));
 
 macro "Initialize Action Tool - CeefD25D4cD52Dd6CdddD18CfffD00D01D02D03D0cD0dD0eD0fD10D11D1eD1fD20D27D28D2fD30D35D3aD3fD44D4bD53D5cD72D82Da3DacDb4DbbDc0Dc5DcaDcfDd0Dd7DdfDe0De1DeeDefDf0Df1Df2Df3DfcDfdDfeDffCcccDd4CfffD26D39D62D7dD92Db3Dc4Dc6Dd8CdefD22D2dDd2DddCaaaDe7CeffD04D0bD29D37D38D40D45D4fD54D55D64D6cD73D7bD83D8aD8dD99D9cDa8Db0DbfDc9Df4DfbCdefD5bD6aD6bDa9Db7Db8CcdfD14D41Db1CfffD12D1dD21D2eD34D36D43D63D93Dd1DdeDe2DedCdefD05D0aD13D1cD31D3eD50D5fDa0DafDc1DceDe3DecDf5DfaC58cD97CeefD46D47D56D65D84CdeeD9dCbdfDebCbcdDadCeefD49D4aD58D59D5aD67D68D69D6dD7cD8cDa5Da6Db5Db6Dc7Dc8CcefD06D09D60D6fD90D9fDf6Df9C58cD75D76D77D78D79D86D87D88CeefD48D57D66D94D95Da4CddeD24D42Dd5CcdeD3dCbbcD3cDe6C9aaDbdCeeeD2aCbdfD07D08D70D7fD80D8fDf7Df8CaceD96CeffD3bCdddD71CccdDe5CabbDe9C999D7eD8eCdefD8bD9aD9bDaaDabDb9DbaCcdfD1bDe4CbcdDcdDdcCddeD15D51CcdeD1aDa1Dc2Dd3CbbdDaeCaabD9eDdbCeeeDa2CbdeDa7DbeCdddD17D19D81CccdDc3CaabD6eC9aaDccCdefD23D32CcdfD4eCbcdDdaCcdeD2cCaaaDe8CbceD74D85CddeD16D33D61D91CcddD5dDb2CbbbD4dCbcdD5eDeaCdeeDbcDcbDd9CccdD2b"
 {
+    
+    // Check if image is multi-channel
+    getDimensions(width, height, channels, slices, frames);
+    
+    if (channels < 2) {
+        exit("This macro requires a multi-channel image. Current image has only " + channels + " channel(s).");
+    }
+    
+    // Must be set up for black background
+    run("Options...", "iterations=1 count=1 black edm=Overwrite do=Nothing");
 
-//Force 8-bit
-	run("8-bit");
-	run("Green");
-	run("Enhance Contrast", "saturated=0.35");
-	
-//Must be set up for black background
-	run("Options...", "iterations=1 count=1 black edm=Overwrite do=Nothing");///////////////////////////////////////////////////////////////////////////////////NEED THIS?????????????????????????????????
+    // Remove scale if any
+    run("Set Scale...", "distance=0 known=0 pixel=1 unit=pixel");
+    run("Remove Overlay");
 
-//remove scale if any
-	run("Set Scale...", "distance=0 known=0 pixel=1 unit=pixel");
-	run("Remove Overlay");
+    image = getTitle();
+    dir = File.directory();
+    gtrack = 1;
+    number = 1;
+    count = 1;
+    daughter = "";
 
-	Image = getTitle();
-	dir = File.directory();
-	gtrack = 1;
-	number = 1;
-	count = 1;
-	daughter = "";
-	getDimensions(width, height, channels, slices, frames);
+    if (frames > slices) {
+        run("Re-order Hyperstack ...", "channels=[Channels (c)] slices=[Frames (t)] frames=[Slices (z)]");
+    }
 
-	if (frames > slices) {
-		run("Re-order Hyperstack ...", "channels=[Channels (c)] slices=[Frames (t)] frames=[Slices (z)]");
-	}
+    getDimensions(width, height, channels, slices, frames);
+    
+    // Display as composite to see both channels
+    Stack.setDisplayMode("composite");
+    
+    // Set C1 (nuclear) to red and C2 (signal) to green for visualization
+    Stack.setChannel(1);
+    run("Red");
+    Stack.setChannel(2);
+    run("Green");
+    
+    // Enhance contrast for better visualization
+    Stack.setChannel(1);
+    run("Enhance Contrast", "saturated=0.35");
+    Stack.setChannel(2);
+    run("Enhance Contrast", "saturated=0.35");
 
-	getDimensions(width, height, channels, slices, frames);
+    // Prompt for calibration of image
+    Dialog.create("Please set calibration values");
+    Dialog.addNumber("Time Step (min):", 2);
+    Dialog.addNumber("Scale (um/px):", 0.619);
+    Dialog.addNumber("Cytoplasmic band width (pixels):", 5);
+    Dialog.addCheckbox("Find random cells?", false);
+    Dialog.addNumber("Number of random cells:", 5);
+    Dialog.addCheckbox("Track ROI?", false);
+    Dialog.show();
+    time_step = Dialog.getNumber();
+    cal = Dialog.getNumber();
+    bandWidth = Dialog.getNumber();  // Make this a global variable
+    rcells = Dialog.getChoice();
+    sample = Dialog.getNumber();
+    track_roi = Dialog.getChoice();
 
-//prompt for calibration of image
-	Dialog.create("Please set calibration values");
-	Dialog.addNumber("Time Step (min):", 10);
-	Dialog.addNumber("Scale (um/px):", 0.619);
-	Dialog.addCheckbox("Find random cells?", false);
-	Dialog.addNumber("Number of random cells:", 5);
-	Dialog.show();
-	time_step = Dialog.getNumber();
-	cal = Dialog.getNumber();
-	rcells = Dialog.getChoice();
-	sample = Dialog.getNumber();
+if (track_roi == true) {
 
-//Promt user to define the hair follicle condensate in the finale frame
-	run("Colors...", "foreground=white background=black selection=cyan");///////////////////////////////////////////////////////////////////////////////////NEED THIS?????????????????????????????????
-	setSlice(slices);
-	run("Select None");
-	setTool("oval");
-	waitForUser("Select Condensate", "Please outline the condensate and press OK");
+//Prompt user to define the hair follicle targetROI in the final frame
+		run("Colors...", "foreground=white background=black selection=red");
+		setSlice(slices);
+		run("Select None");
+		setTool("oval");
+		waitForUser("Select ROI", "Please outline the target ROI and press OK");
+
+//Only if ROI tracking is ticked//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
 
 //save snapshots frame 1 and last
-	run("Select None");
-	setSlice(1);
-	run("Duplicate...", " ");
-	run("Restore Selection");
-	run("RGB Color");
-	run("Colors...", "foreground=red background=red selection=red");
-	run("Draw");
-	run("Select None");
-	saveAs("Tiff", dir+Image+"_ROI_First.tif");
-	run("Close");
-	run("Select None");
-	setSlice(slices);
-	run("Duplicate...", " ");
-	run("Restore Selection");
-	run("RGB Color");
-	run("Colors...", "foreground=red background=red selection=red");
-	run("Draw");
-	run("Select None");
-	saveAs("Tiff", dir+Image+"_ROI_Last.tif");
-	run("Close");
-
-//get the skeleton of the condensate
-	selectWindow(Image);
-	run("Restore Selection");
-
-	if (isOpen("Results")){
-		selectWindow("Results");
+		run("Select None");
+		setSlice(1);
+		run("Duplicate...", " ");
+		run("Restore Selection");
+		run("RGB Color");
+		run("Colors...", "foreground=red background=red selection=red");
+		run("Draw");
+		run("Select None");
+		saveAs("Tiff", dir+image+"_ROI_First.tif");
 		run("Close");
-	}
+		run("Select None");
+		setSlice(slices);
+		run("Duplicate...", " ");
+		run("Restore Selection");
+		run("RGB Color");
+		run("Colors...", "foreground=red background=red selection=red");
+		run("Draw");
+		run("Select None");
+		saveAs("Tiff", dir+image+"_ROI_Last.tif");
+		run("Close");
+
+//get the skeleton of the target ROI
+		selectWindow(image);
+		run("Restore Selection");
+
+		if (isOpen("Results")){
+			selectWindow("Results");
+			run("Close");
+		}
 
 //get all the x and y positions of the pixels in the selection 
-	getSelectionBounds(x0, y0, width, height); 
+		getSelectionBounds(x0, y0, width, height); 
 
-	for (y=y0; y<y0+height; y++) {
-  		for (x=x0; x<x0+width; x++) { 
-    		if (selectionContains(x, y)){ 
-     			x_values = Array.concat(x_values, x);
-     			y_values = Array.concat(y_values, y);
-     		}
-  		} 
-	}	
+		for (y=y0; y<y0+height; y++) {
+  			for (x=x0; x<x0+width; x++) { 
+    			if (selectionContains(x, y)){ 
+   		  			x_values = Array.concat(x_values, x);
+   		  			y_values = Array.concat(y_values, y);
+   		  		}
+  			} 
+		}	
 
-	get_skel_xy(Image);
+		get_skel_xy(image);
 
 //add to the saved images
-	open(dir+Image+"_ROI_First.tif");
-	run("Restore Selection");
-	run("Colors...", "foreground=yellow background=black selection=red");
-	run("Draw");
-	run("Select None");
-	saveAs("Tiff", dir+Image+"_ROI_First.tif");
-	run("Close");
+		open(dir+image+"_ROI_First.tif");
+		run("Restore Selection");
+		run("Colors...", "foreground=yellow background=black selection=red");
+		run("Draw");
+		run("Select None");
+		saveAs("Tiff", dir+image+"_ROI_First.tif");
+		run("Close");
 
-	open(dir+Image+"_ROI_Last.tif");
-	run("Restore Selection");
-	run("Colors...", "foreground=yellow background=black selection=red");
-	run("Draw");
-	run("Select None");
-	saveAs("Tiff", dir+Image+"_ROI_Last.tif");
-	run("Close");
+		open(dir+image+"_ROI_Last.tif");
+		run("Restore Selection");
+		run("Colors...", "foreground=yellow background=black selection=red");
+		run("Draw");
+		run("Select None");
+		saveAs("Tiff", dir+image+"_ROI_Last.tif");
+		run("Close");
 
 //save log of coordinates
-	print("X Values");
-	Array.print(x_values);
-	print("Y Values");
-	Array.print(y_values);
-	selectWindow("Log");
-	saveAs("Text", dir+Image+"Selection_Coordinates.txt");
-
-	if (isOpen("Log")){
+		print("X Values");
+		Array.print(x_values);
+		print("Y Values");
+		Array.print(y_values);
 		selectWindow("Log");
-		run("Close");
-	}
+		saveAs("Text", dir+image+"Selection_Coordinates.txt");
+
+		if (isOpen("Log")){
+			selectWindow("Log");
+			run("Close");
+		}
+
+}
+
+//Only if ROI tracking is ticked//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	if (rcells == true) {
 	//add all cells to the manager in order to choose random cells
@@ -212,10 +249,9 @@ macro "Initialize Action Tool - CeefD25D4cD52Dd6CdddD18CfffD00D01D02D03D0cD0dD0e
 		run("Restore Selection");
 		run("Draw");
 		run("Make Binary");
-//run("Invert");//////////////////////////////////////////////////////////////////////////////////////////////////CHECK YOU NEED THIS LINE ON YOUR SETUP
 		run("Analyze Particles...", "exclude add");
 
-		selectWindow(Image);
+		selectWindow(image);
 		roiManager("Show All");
 
 		if (isOpen("Clipboard")){
@@ -248,7 +284,7 @@ macro "Initialize Action Tool - CeefD25D4cD52Dd6CdddD18CfffD00D01D02D03D0cD0dD0e
 		n=nResults(); 
 		rois=newArray(n); 
 
-		for(i=0;i<n;i++) {//These curly brackets were not closed on 150517**********************************************************************
+		for(i=0;i<n;i++) {
    		 	rois[i]=k++;
 		} 
 
@@ -268,10 +304,10 @@ macro "Initialize Action Tool - CeefD25D4cD52Dd6CdddD18CfffD00D01D02D03D0cD0dD0e
     		run("Close");
 		}
 
-		selectWindow(Image);
+		selectWindow(image);
 		roiManager("Show None");
 
-		roiManager("Select", roi_n);/////is it missing the first one?
+		roiManager("Select", roi_n);
 		run("Enlarge...", "enlarge=10");
 	}
 	run("Select None");
@@ -280,63 +316,130 @@ macro "Initialize Action Tool - CeefD25D4cD52Dd6CdddD18CfffD00D01D02D03D0cD0dD0e
 	run("Colors...", "foreground=white background=white selection=cyan");
 }
 
-macro "Manual Track Tool - CfffD00D01D02D03D04D05D06D07D0bD0cD0dD0eD0fD10D11D12D13D14D15D16D17D19D1bD1cD1dD1eD1fD20D21D22D23D24D25D26D2bD2cD2dD2eD2fD30D31D32D33D34D39D3aD3bD3cD3dD3eD3fD40D41D42D43D50D51D52D53D60D61D62D68D69D6aD70D71D77D78D79D7aD7bD7cD7dD84D87D88D89D8aD8bD8cD8dD8eD8fD91D93D94D97D98D99D9aD9bD9cD9dD9eD9fDa3Da4Da7Da8Da9DaaDabDacDadDaeDafDb0Db1Db2Db3Db4Db8Db9DbaDbbDbcDbdDbeDbfDc0Dc1Dc2Dc3Dc4Dc9DcaDcbDccDcdDceDcfDd0Dd1Dd2Dd3Dd4Dd9DdaDdbDdcDddDdeDdfDe0De1De2De3De4De5DeaDebDecDedDeeDefDf0Df1Df2Df3Df4Df5DfbDfcDfdDfeDffC48dD4dD6cDc8Dd7Dd8De6De7Df6C37dD7fDfaC69eDa5C777D45C58dD6dDc6Dd5C999D27D36D37D38D54D63D64D72D73D74D83C8beD5eD75C48dD6bDb7Dc7Dd6C48dD4eDf7C8aeD49D4aD58D59C888D28D46D55D82C59eD96Db6C9beD57C47dD4fD7eDe8De9Df8Df9C7aeD5fD6fC59dDb5Dc5C8beD5aD66C69dD47D65C69eD76D86Da6C9beD5bD5cD5dD85C7aeD48D4bC59eD4cC59dD67C8beD95C6aeD6e" 
+macro "Manual Track Tool - CfffD00D01D02D03D04D05D06D07D0bD0cD0dD0eD0fD10D11D12D13D14D15D16D17D19D1bD1cD1dD1eD1fD20D21D22D23D24D25D26D2bD2cD2dD2eD2fD30D31D32D33D34D39D3aD3bD3cD3dD3eD3fD40D41D42D43D50D51D52D53D60D61D62D68D69D6aD70D71D77D78D79D7aD7bD7cD7dD84D87D88D89D8aD8bD8cD8dD8eD8fD91D93D94D97D98D99D9aD9bD9cD9dD9eD9fDa3Da4Da7Da8Da9DaaDabDacDadDaeDafDb0Db1Db2Db3Db4Db8Db9DbaDbbDbcDbdDbeDbfDc0Dc1Dc2Dc3Dc4Dc9DcaDcbDccDcdDceDcfDd0Dd1Dd2Dd3Dd4Dd9DdaDdbDdcDddDdeDdfDe0De1De2De3De4De5DeaDebDecDedDeeDefDf0Df1Df2Df3Df4Df5DfbDfcDfdDfeDffC48dD4dD6cDc8Dd7Dd8De6De7Df6C37dD7fDfaC69eDa5C777D45C58dD6dDc6Dd5C999D27D36D37D38D54D63D64D72D73D74D83C8beD5eD75C48dD6bDb7Dc7Dd6C48dD4eDf7C8aeD49D4aD58D59C888D28D46D55D82C59eD96Db6C9beD57C47dD4fD7eDe8De9Df8Df9C7aeD5fD6fC59dDb5Dc5C8beD5aD66C69dD47D65C69eD76D86Da6C9beD5bD5cD5dD85C7aeD48D4bC59eD4cC59dD67C8beD95C6aeD6e"
 {
-
-run("Restore Selection");
-
-//check there is a selection, if not ask to press the new track button
-    type = selectionType();
-    if (type == -1) {exit("There is no selection have you initialised the image?");}
-
-//some variables
-	track = toString(gtrack)+toString(daughter);
+    // some variables
+    dist = 0;
+    track = toString(gtrack) + toString(daughter);
     slice = getSliceNumber(); 
     width = getWidth();
     height = getHeight();
+    cell_area  = 0;
+    cell_feret = 0;
+    cell_circ  = 0;
 
-//draws the tracking table
+    // draw / open tracking table
     requires("1.41g");
-	title1 = Image+"_Tracking Table";
-	title2 = "["+title1+"]";
-	f = title2;
+    title1 = image + "_Tracking Table";
+    title2 = "[" + title1 + "]";
+    f = title2;
 
-	if (isOpen(title1)) {
-	}
-		else {
-			run("Table...", "name="+title2+" width=1000 height=300");
-			print(f, "\\Headings: \tImage_ID\tTrack\tSeed\tFrame\tSlice\tCh\tX\tY\tFollicle_COMX\tFollicle_COMY\tDistance_from_COM_(um)\tInside?");
-		}
-
-    //run("Colors...", "foreground=white background=white selection=cyan");
-    autoUpdate(false);
-    getCursorLoc(x, y, z, flags);
-    //makePoint(x, y);
-    makeOval(x-1,y-1,3,3);
-	run("Add Selection...");
-	makePoint(x, y);
-    wait(300);
-    //run("Colors...", "foreground=white background=white selection=red");
-    run("Enlarge...", "enlarge=5");
-
-	//get nearest distance to the skeleton
-	posx = x;
-	posy = y;
-	get_s_dist(x, y, xpoints, ypoints, cal);
-    dist = shortest;
-
-//is the xy position within the condensate at this time point?
-    inside = "No";
-
-    for (i = 0; i < x_values.length; i++) {
-       if ((x == x_values[i]) && (y == y_values[i])) {inside = "Yes";} else {}
+    if (!isOpen(title1)) {
+        run("Table...", "name=" + title2 + " width=1000 height=300");
+        print(f, "\\Headings: \tImage_ID\tTrack\tMother?\tFrame\tSlice\tCh\tX\tY\tFollicle_COMX\tFollicle_COMY\tDistance_from_COM_(um)\tInside?\tArea\tFeret\tCirc.\tNuc_Mean\tCyto_Mean\tNC_Ratio");
     }
 
-    print(f,(number++)+"\t"+Image+"\t"+track+"\t"+is_seed+"\t"+(slice)+"\t"+"1"+"\t"+"1"+"\t"+(x)+"\t"+(y)+"\t"+(com_roi_x)+"\t"+(com_roi_y)+"\t"+dist+"\t"+inside);
-	last_line = ""+(slice)+"\t"+"1"+"\t"+"1"+"\t"+(x)+"\t"+(y)+"\t"+(com_roi_x)+"\t"+(com_roi_y)+"\t"+dist+"\t"+inside;
-//advance to next slice
-    run("Next Slice [>]");
-    selectWindow(Image);
+    autoUpdate(false);
+    getCursorLoc(x, y, z, flags);
+    makeOval(x-1, y-1, 3, 3);
+    run("Add Selection...");
+    makePoint(x, y);
+    wait(300);
+    run("Enlarge...", "enlarge=5");
+
+    setBatchMode(true);
+
+    // nearest distance to skeleton if ROI tracking is enabled
+    if (track_roi == true) {
+        posx = x;
+        posy = y;
+        get_s_dist(x, y, xpoints, ypoints, cal);
+        dist = shortest;
+    }
+
+    // --- get morphology + N/C values ---
+    morphology_values = newArray();
+    morphology_values = get_cell_properties(x, y);
+
+    // shape
+    cell_area  = morphology_values[0];
+    cell_feret = morphology_values[1];
+    cell_circ  = morphology_values[2];
+
+    // centre of mass 
+    com_x = morphology_values[3];
+    com_y = morphology_values[4];
+
+    // nuclear / cytoplasmic intensities
+    nuc_mean  = morphology_values[5];
+    cyto_mean = morphology_values[6];
+    nc_ratio  = morphology_values[7];
+
+    // Clear generic Results window if open (tracking table is a different window)
+    if (isOpen("Results")) {
+        selectWindow("Results");
+        run("Close");
+    }
+
+    setBatchMode(false);
+
+    // is the xy position within the tracked ROI at this time point?
+    inside = "No";
+    if (track_roi == true) {
+        for (i = 0; i < x_values.length; i++) {
+            if ((x == x_values[i]) && (y == y_values[i])) {
+                inside = "Yes";
+            }
+        }
+    }
+
+    // --- Print one row to the tracking table ---
+    print(f,
+        (number++) + "\t" +
+        image + "\t" +
+        track + "\t" +
+        is_mother + "\t" +
+        (slice) + "\t" +
+        "1\t1\t" +
+        (com_x) + "\t" +
+        (com_y) + "\t" +
+        (com_roi_x) + "\t" +
+        (com_roi_y) + "\t" +
+        dist + "\t" +
+        inside + "\t" +
+        cell_area + "\t" +
+        cell_feret + "\t" +
+        cell_circ + "\t" +
+        nuc_mean + "\t" +
+        cyto_mean + "\t" +
+        nc_ratio
+    );
+
+    // last_line: keep original format (no N/C) so mitosis logic stays unchanged
+    last_line =
+        "" + (slice) + "\t" + "1" + "\t" + "1" + "\t" +
+        (com_x) + "\t" + (com_y) + "\t" +
+        (com_roi_x) + "\t" + (com_roi_y) + "\t" +
+        dist + "\t" + inside + "\t" +
+        cell_area + "\t" + cell_feret + "\t" + cell_circ;
+
+    // --- advance to next time point / slice in a robust way ---
+    selectWindow(image);
+
+    // get stack dimensions and current position
+    Stack.getDimensions(w, h, ch, sl, fr);
+    Stack.getPosition(c, s, t);
+
+    // If it’s a pure time-series hyperstack (frames > 1, single slice),
+    // step in time. Otherwise, step in slices.
+    if (fr > 1 && sl == 1) {
+        if (t < fr)
+            Stack.setPosition(c, s, t + 1);
+    } else {
+        if (s < sl)
+            Stack.setPosition(c, s + 1, t);
+    }
+
 }
 
 macro "Add Track Action Tool - CfffD00D01D02D03D04D05D06D07D0bD0cD0dD0eD0fD10D11D12D13D14D15D16D17D19D1bD1cD1dD1eD1fD20D21D22D23D24D25D26D2bD2cD2dD2eD2fD30D31D32D33D34D39D3aD3bD3cD3dD3eD3fD40D41D42D43D50D51D52D53D60D61D62D68D69D6aD70D71D77D78D79D7aD7bD7cD7dD84D87D88D89D8aD8bD8cD8dD8eD8fD91D93D94D97D98D99D9fDa3Da4Da7Da8Db0Db1Db2Db3Db4Db8DbcDc0Dc1Dc2Dc3Dc4DcbDccDcdDd0Dd1Dd2Dd3Dd4DdcDe0De1De2De3De4De5Df0Df1Df2Df3Df4Df5DffC37dD7fC777D45C69dD47D65C777D08D09D0aD18D1aD29D2aD35D44D56D80D81D90D92Da0Da1Da2C48dD6bDb7Dc7Dd6Cbd9DabDbaDbbDceDecC8beD5eD75C582DaeDeaDeeC48dD4dD6cDc8Dd7Dd8De6De7Df6C999D27D36D37D38D54D63D64D72D73D74D83C7aeD48D4bC8b6DadDbeDdbDdeDebDedC59dDb5Dc5C9beD57C361D9dC48dD4eDf7C888D28D46D55D82C69eDa5C58dD6dDc6Dd5Cbd9DacC684Dc9C8aeD49D4aD58D59C8b6DdaC59dD67C9beD5bD5cD5dD85C47dD4fD7eDe8Df8Df9C69eD76D86Da6C8beD5aD66C473De9C7aeD5fD6fC8beD95C473D9cC6aeD6eCdebDcaC8a6DaaC59eD96Db6C59eD4cC695Da9Db9C584D9bDd9C8b6DbdDddC685D9a"
@@ -348,7 +451,7 @@ macro "Add Track Action Tool - CfffD00D01D02D03D04D05D06D07D0bD0cD0dD0eD0fD10D11
 	run("Colors...", "foreground=white background=white selection=cyan");
 
 	if (rcells == true) {
-//randomly make a slection from manager
+//randomly make a selection from manager
 
 		if (roi_n < (roiManager("count"))-1) {
   		  		roi_n = roi_n + 1;
@@ -362,7 +465,7 @@ macro "Add Track Action Tool - CfffD00D01D02D03D04D05D06D07D0bD0cD0dD0eD0fD10D11
     	//setTool("rectangle");
 	}
     gtrack++;
-	is_seed = true;//are we on a seed track or a daughter track?
+	is_mother = true;//are we on a mother track or a daughter track?
  	daughter = "";//this is either a or b and is appended to gtrack in the results table
 	mitosis_frame = 0;//remember when the mitosis happened so we can go back to track the second daughter
 	mitosis = "";//forget this string
@@ -373,7 +476,7 @@ macro "Add Track Action Tool - CfffD00D01D02D03D04D05D06D07D0bD0cD0dD0eD0fD10D11
 macro "Add Mitosis Action Tool - CfffD00D01D02D03D04D05D06D07D08D09D0aD0cD0dD0eD0fD10D11D12D13D14D15D16D17D1dD1eD1fD20D21D22D23D24D25D2eD2fD30D31D32D33D34D3fD40D41D42D43D44D4fD50D51D52D53D5eD5fD60D69D6aD6dD6eD6fD70D78D79D7aD7cD7dD7eD7fD80D88D89D8aD8cD8dD8eD8fD90D99D9aD9dD9eD9fDa0Da1Da2Da3DaeDafDb0Db1Db2Db3Db4DbfDc0Dc1Dc2Dc3Dc4DcfDd0Dd1Dd2Dd3Dd4Dd5DdeDdfDe0De1De2De3De4De5De6De7DedDeeDefDf0Df1Df2Df3Df4Df5Df6Df7Df8Df9DfaDfcDfdDfeDffC8c8Db7C6b6D27D28CacaDfbC494DaaC9c9D98C7b7D6bD72D76D82D83CbeaD3eC483D63Dd7Dd8C9c8D56D57D66Db9DbaDcaDcbDccC7b7D46D77D86CadaD1cC6a6D67D95DdcC9d9D48C8c7D1bD2cD4dCefeD35C373D61C8c8D2bD3dDc9C7b6D58D65D9bDabDacDbdDc7DcdCadaD4bD4cDceC695DebC9c9DddC7c7D73CcdcDa4C484D94C8a7Db5CbdaD7bC6a6DdbCad9D38D39D49D4aD6cCefeD18D19D1aDeaC372D71C8b8DecC6b6D29Cad9D3aC5a5D36C9c9D47D9cDbbDbcC8c7D5bCbdbDd6C484Dd9CadaD2dD3bD3cD5dCefeDe9C373D62D93Da5Dc6CadaD8bC6a5D5aCac9D68DadC8c7D5cD74D84D85Da6Da7CeeeDc5De8C494D55Da9DdaCbdaD4eC7a7D87C272D81D92C8c8D37D75D96Db8Dc8C594D64CbebD0bC6a5D97Da8Db6CdedD54C9b8D45C7b6D2aCadaDbeC5a5D59CcecD26"
 {
 	
-	is_seed = false;//are we on a seed track or a daughter track?
+	is_mother = false;//are we on a mother track or a daughter track?
 	if (daughter == "") {
 		daughter = "a";//this is either a or b and is appended to gtrack in the results table
 		run("Colors...", "foreground=white background=white selection=red");
@@ -396,7 +499,7 @@ macro "Switch Daughter Action Tool - CcdcD98C696DbcCfffD00D01D02D07D08D0dD0eD0fD
 	run("Colors...", "foreground=white background=white selection=yellow");
 	setSlice(mitosis_frame);
 	makePoint(mitosis_x, mitosis_y);
-    //run("Colors...", "foreground=white background=white selection=cyan");
+    //run("Colors...", "foreground=white background=white selection=red");
     run("Enlarge...", "enlarge=15");
 
 	if (daughter == "") {
@@ -407,6 +510,150 @@ macro "Switch Daughter Action Tool - CcdcD98C696DbcCfffD00D01D02D07D08D0dD0eD0fD
 	waitForUser("The track has switched to "+gtrack+daughter);
 }
 
+macro "Reanalyze Action Tool - Cad8DccCd54D9bCed8D88C676DdfC7adDd2Cbc5D99CefeD1cD1eDa1Db1Dc1Dd1De1C666D07D08D09D0aD0bD0cD0dD2fD3fD4fD5fD6fD7fD8fD9fDa0DafDb0DbfDc0DcfDd0DefDf2Df3Df4Df5Df6Df7Df8Df9DfaDfbDfcDfdDfeCdd8D37Caa5D7cCfe9D68C8c6D5bCbceDa7Ccc4D73CfffD11D15D16D17D18D19D1aD21D61D81D91C665D02D03D04D05D06D0eD1fD20D30D40D50D60D70D80D90C79cDd3Cf55D54Cff8D64C8b6D7bC9bdDd7Cac8DbdCfffD12D13D14D1bD31D41D51D71CcdaDb8Cd85D8cCffaD26D48C8c7DdbCdedD4eD5eD6eD7eD8eD9eDceDe7De8DeaDebDecDeeCcd7Dd8C565D01D10De0Df1Cad8D4cD6aCb85D79Cee8D23D36D47D58C8bdDa3C9c7D5cCefeD1dCcd9D2bCb96DdaCeeaD29CcddDa8Cdd5D75D98C8adDb5Cf66D66Cee9D25D38D49C9beDa5Dc4Cac8D5dDddCdedD2eD3eDe3De4De5De6DedCd96Dd9CffbD2aC9c7D3bCdd7Dc9Cad8DcdCe64D55Cee8D52C8adD92Dd4C9c7D7aCcd9Da9Caa7D9dCff9D22D24D46CaceDa4Dc6Ccc5D72C7adDc3Cf65D43Cff8D62C9beD94C9c8D4bDdcCdecDbeCe85DcaCffaD28Cdd7D33D57D86Cbd9D4dCc85D7dC9beDb4Cbc7D59Ccd9D84Cca7D6dCdedDe2Cdd6D74CabbD83Ce76DadCabeDd6Cbc8D8dCea5DbaCdedDdeCed7D76Cac8D3dCe54D9cCfd8D44C8adDb2Cbb7D97Cde8DaaCaa6D9aCff9D27Ccc5Db9C79dDb3Ce55D78CabdDb7Dc7Cd95D53Cb85DbbC9bdDc5C9c7D3cD6bDbcCbdaD2dCba7D8bC9bdD95Cf76D42Ce96D65Ced7D56Cad8D6cCd74DabCee8D34D45C8aeDc2C9c7D5aCdd8D39C9b7DcbCcc5D85C8adD93Dd5Ce75D77CdecDe9Ce96D67Cad9D2cCd76D89C9beDa2Cdd9Dc8Cca7DacCbdfDa6Cdd6D87CbccD96Cf77D8aCaceDb6Ceb6D32CeedDaeCdd7D35C9c7D69Cbe9D4aCde9D3aCaceD82Cee7D63" {
+
+//Re-run an analysis using the x,y coordinates in the results table
+//Requires an open results table and the corresponding image
+
+//Check for results table
+	if (!isOpen("Results")) {
+    		exit("There is no Results table open");
+	}
+
+//Check that image title matches the "Image_ID" entry in Results table
+	testID = getTitle();
+	dataID = getResultString("Image_ID", 1);
+
+	if (testID != dataID) {
+    		choice = getBoolean("The Image name does not match the ImageID in the results table. Continue?");
+    		if (!choice) exit("Please load matching datasets");
+	}
+
+//Get dimensions
+	Stack.getDimensions(width, height, channels, slices, frames);
+
+//Requires ImageJ 1.41g or later
+	requires("1.41g");
+
+//Get image title
+	imgTitle = getTitle();
+	title1 = imgTitle + "_Tracking Table";
+	title2 = "[" + title1 + "]";
+	f = title2;
+
+//Create the output table only if it’s not already open
+	if (!isOpen(title1)) {
+    		run("Table...", "name=" + title2 + " width=1000 height=300");
+    		print(f, "\\Headings:\tImage_ID\tTrack\tMother?\tFrame\tSlice\tCh\tX\tY\tOld_X\tOld_Y\tFollicle_COMX\tFollicle_COMY\tDistance_from_COM_(um)\tInside?\tArea\tFeret\tCirc.");
+	}
+
+//Store original x,y,frame values in arrays
+	old_x_values = newArray();
+	old_y_values = newArray();
+	old_frames   = newArray();
+
+	for (i=0; i<nResults; i++) {
+    		x = getResult("X", i);	
+    		y = getResult("Y", i);
+    		fr = getResult("Frame", i);
+    		old_x_values = Array.concat(old_x_values, x);
+    		old_y_values = Array.concat(old_y_values, y);
+    		old_frames   = Array.concat(old_frames, fr);
+	}
+
+//Save and close the original Results table
+	dir = File.directory();
+	selectWindow("Results");
+	saveAs("Results", dir+"Results.csv");
+	close("Results");
+
+//Arrays to store new measurements
+	new_areas = newArray();
+	new_feret = newArray();
+	new_circs = newArray();
+	new_com_x = newArray();
+	new_com_y = newArray();
+
+//Perform measurements in batch mode
+    setBatchMode(true);
+
+    for (i=0; i<old_x_values.length; i++) {
+        x = old_x_values[i];
+        y = old_y_values[i];
+
+        setSlice(old_frames[i]);
+
+        // 1) Measure at original (x0,y0)
+        morphology_values = get_cell_properties(x, y);
+        area  = morphology_values[0];
+
+        // 2) Only correct if initial area > 5000
+        if (area > 5000) {
+            corrected_xy = correct_xy(imgTitle, x, y);
+            x1 = corrected_xy[0];
+            y1 = corrected_xy[1];
+
+            // re-measure after correction
+            morphology_values = get_cell_properties(x1, y1);
+            area  = morphology_values[0];
+
+            // set to corrected coords for any kept outputs
+            x = x1;
+            y = y1;
+        }
+
+        // 3) If still > 5000 after (optional) correction, skip this datapoint
+        if (area > 5000) {
+            new_areas = Array.concat(new_areas, "NaN");
+            new_feret = Array.concat(new_feret, "NaN");
+            new_circs = Array.concat(new_circs, "NaN");
+            new_com_x = Array.concat(new_com_x, "NaN");
+            new_com_y = Array.concat(new_com_y, "NaN");
+        } else {
+            // keep: append measurements and COM, remember original row index
+            new_areas = Array.concat(new_areas, morphology_values[0]);
+            new_feret = Array.concat(new_feret, morphology_values[1]);
+            new_circs = Array.concat(new_circs, morphology_values[2]);
+            new_com_x = Array.concat(new_com_x, morphology_values[3]);
+            new_com_y = Array.concat(new_com_y, morphology_values[4]);
+        }
+    }
+    
+    setBatchMode(false);
+
+//Reopen saved
+	open(dir+"Results.csv");
+
+//Write new combined table once
+	number = 0;
+	for (i=0; i<nResults; i++) {
+    		print(f,
+     		number++ + "\t" +
+        	getResultString("Image_ID", i) + "\t" + 
+        	getResultString("Track", i) + "\t" + 
+        	getResult("Mother?", i) + "\t" + 
+        	getResult("Frame", i) + "\t" + 
+        	getResult("Slice", i) + "\t" + 
+        	getResult("Ch", i) + "\t" +
+        	new_com_x[i] + "\t" +
+        	new_com_y[i] + "\t" +
+        	old_x_values[i] + "\t" +
+        	old_y_values[i] + "\t" +
+        	getResult("Follicle_COMX", i) + "\t" +
+        	getResult("Follicle_COMY", i) + "\t" +
+        	getResult("Distance_from_COM_(um)", i) + "\t" +
+        	getResult("Inside", i) + "\t" +
+        	new_areas[i] + "\t" + 
+        	new_feret[i] + "\t" + 
+        	new_circs[i]); 	
+	}
+
+}
+
+macro "Parse to mdf2 Action Tool - Cf01D38Ce23D46CfffD00D01D02D03D04D05D06D07D08D09D0aD0bD0cD0dD0eD0fD10D1fD20D24D26D27D2fD30D31D36D3bD3fD40D41D42D43D49D4aD4bD50D51D52D53D59D5aD60D61D62D66D69D70D71D75D76D77D80D81D84D85D86D90D91D94D95D9fDa0Da1DafDb0Db1Db2DbdDbfDc0Dc1Dc2DcfDd0Dd1Dd2Dd3DdbDdfDe0De1De2De3De4DebDecDefDf0Df1Df2Df3Df4Df9DfaDfbDfcDfdDfeDffC26bD1aD1bCfebDb7Cec5D7cC862D4eCfe5D9bCd94De5C45bD57CfeeD8fDf8Cec8Dc7C26bD1cD1dD1eD2eD3eCf66D37Cf65De9C38eD34CfeeDa4DeaCec7D7aC689Da6CfaaD2aCda6Df7C7aeD58CfeeD3aDc3CeddD28C26aDaeDbeDceDdeDeeCf12D47Ce55Dc4C37cD11D12D13D14D15D16D17CffcD7bD8aD99Da8Cec6Dc8Cb71D7dCfc9D5eCd95De8CaabD79CffeD5dDd6CfdbDc6C47aD88Cf88D65Cf77D83D92Cfd7DabDbaDc9C9a6D5bCfccDa2Cdb7D5cCbdbD2dCfffDedCcdfD21C593DcbCf33D55C36bD19CfecDe7Cfd5D8cD9aDa9C862D5fCd95D6dDacC48dD33CedaDe6Cf88D48Cd94DbbCed7D89D98D9cC66bD45CfbbD29Cdb7D6bC8beD32Da5CfedDbcC58aD97Cf22D39Cf55D73Da3Db4Cfe5DaaDb9Cb84D6fCfc9D6eCda5Dc5C7aeD67CeccD2bCf99D54Cf77D63C8b8DdcCfddD74Cdb9D6cCaceDd4CdefD23C673D4cCe34D56C05eD68Ca62D8eCd94DcaCed8Da7Cf66Db3Cfd6Db8C69aDb5Cca7D7fC8beD35CfedDdaCfd6D8bCc84D7eCea5Dd9C6aeD44D96CedbDf5C8a8D3cCdb8Dd5CcdcD3dC594DccCf44D64C37bD18Ca84D4dC58eD87CfdaDd7Cf66D82D93Cc95Df6Ceb7Db6CefeD2cDcdCc84D9dCda6Dd8CedcDadCcc8D6aCfaaD72CbceD22CeefD25C05eD78C469D9eCc94D8dCabaDdd"
+{	
+	convert_to_mdf2();
+}
 
 macro "Data Operations Menu Tool - CfffD00D0eD0fD10D14D15D16D17D18D19D1aD1bD1cD1eD1fD20D24D27D2aD2eD2fD30D34D37D3aD3eD3fD40D44D45D46D47D48D49D4aD4bD4cD4eD4fD50D54D57D5aD5eD5fD60D64D67D6aD6eD6fD70D74D75D76D77D78D79D7aD7bD7cD7eD7fD80D84D87D8aD8eD8fD90D94D97D9aD9eD9fDa0Da4Da5Da6Da7Da8Da9DaaDabDacDaeDafDb0Db4Db7DbaDbeDbfDc0Dc4Dc7DcaDceDcfDd0Dd4Dd5Dd6Dd7Dd8Dd9DdaDdbDdcDdeDdfDe0DeeDefDf0Df1Df2Df3Df4Df5Df6Df7Df8Df9DfaDfbDfcDfdDfeDffC9c9D5bD6bD85D86D95D96C7adD07D61C8adD02C68bD3dCf66D2bD3bC6beD28D29D38D39D55D56D65D66CbcdD01De1C58bDe6CdddD25D26D35D36D58D59D68D69D8bD9bDb5Db6DbbDc5Dc6DcbC7adD03D04D05D06D13D21D23D31D33D41D43D51D53D63D73D83D93Da3Db3Dc3Dd3C9beD12D22D32D42D52D62D72D82D92Da2Db2Dc2Dd2C79cD91Da1Cfd6Db8Db9Dc8Dc9CeeeD8cD9cDbcDccC57aD9dC89cDd1C9bdD11C69cD0aD0bD0cDb1Dc1Cfa7D88D89D98D99CdedD5cD6cC68bD4dDe4De5C79dD08D09D71D81CfccD2cD3cC68cD1dC58bD5dC57bD6dD7dD8dDe7De8De9C8acD0dDedC68cD2dDe3C79cDe2"
 {
@@ -417,7 +664,7 @@ macro "Data Operations Menu Tool - CfffD00D0eD0fD10D14D15D16D17D18D19D1aD1bD1cD1
 
 //if the results table is empty prompt for a results table - prompt for calibration of image
 		Dialog.create("Please set calibration values");
-		Dialog.addNumber("Time Step (min):", 10);
+		Dialog.addNumber("Time Step (min):", 2);
 		Dialog.addNumber("Scale (um/px):", 0.619);
 		Dialog.show();
 		time_step = Dialog.getNumber();
@@ -439,6 +686,7 @@ macro "Data Operations Menu Tool - CfffD00D0eD0fD10D14D15D16D17D18D19D1aD1bD1cD1
 				per_track_summary();
 			}
 	}
+	
 
 	else if (cmd=="Align Tracks") {
 		
@@ -448,8 +696,12 @@ macro "Data Operations Menu Tool - CfffD00D0eD0fD10D14D15D16D17D18D19D1aD1bD1cD1
 		align_data("Acc_Dist_(um)");
 		align_data("Euclidean_D_(um)");
 		align_data("Persistence");
+		align_data("Area");
+		align_data("Feret");
+		align_data("Circ.");
 		
 	}
+	
 }
 
 //////////////////////////////////////////////////////////////////////FUCNTIONS HERE//////////////////////////////////////////////////////////////////////
@@ -886,7 +1138,7 @@ function per_track_summary() {
 		done1 = false;
 		for (j=0; j<nResults && !done1; j++) {
 		 	if (getResultString("Track", j) == toString(track_number[i])){
-		 		comd = (getResult("Distance_from_COM_(um)", j));//removed calibartion form here as it is now calibrtated 060520
+		 		comd = (getResult("Distance_from_COM_(um)", j));//removed calibration from here as it is now calibrated 060520
 		 		dist_com = Array.concat(dist_com, comd);
 		 		done1 = true; // break 
 		 	}
@@ -898,7 +1150,7 @@ function per_track_summary() {
 	for (i=0; i<track_number.length; i++){
 		for (j=0; j<nResults; j++) {
 		 	if (getResultString("Track", j) == toString(track_number[i])){
-		 		comd = (getResult("Distance_from_COM_(um)", j));//removed calibartion form here as it is now calibrtated 060520
+		 		comd = (getResult("Distance_from_COM_(um)", j));//removed calibration from here as it is now calibrated 060520
 		 	}	 	
 		}
 		end_dist_com = Array.concat(end_dist_com, comd);
@@ -988,9 +1240,9 @@ function list_no_repeats (table, heading) {
 }
 
 function list_no_repeats_filter (table, heading, filter, boolean) {
-//returns and array of the entries in a column wihtour repeats filtered by the contents of anothee column
+//returns an array of the entries in a column without repeats filtered by the contents of another column
 
-//check whetehr the table exists
+//check whether the table exists
 	if (isOpen(table)) {
 //no_repeats must contain the first entry
 	no_repeats = newArray();
@@ -1027,23 +1279,23 @@ function list_no_repeats_filter (table, heading, filter, boolean) {
 }
 
 function align_data(column) {
-//get the seed track numbers
-	seed_tracks = list_no_repeats_filter("Results", "Track", "Seed", 1);
+//get the mother track numbers
+	mother_tracks = list_no_repeats_filter("Results", "Track", "Mother?", 1);
 
 	s_length = 0;
 //get the length of the longest track
 	for (i=0; i<nResults; i++) {
-		if ((getResult("Seed",i) == 1) && (getResult("T_Length",i)>s_length)) {
+		if ((getResult("Mother?",i) == 1) && (getResult("T_Length",i)>s_length)) {
 			s_length = getResult("T_Length",i);
 		}
 	}
 
-print("Seed tracks aligned for "+column);
-//write each track to the log preceeded by zero entries upto slength
-	for (i=0; i<seed_tracks.length; i++) {
+print("Mother tracks aligned for "+column);
+//write each track to the log preceeded by zero entries up to s_length
+	for (i=0; i<mother_tracks.length; i++) {
 		s_array = newArray();
 		for (j=0; j<nResults; j++) {
-			if (getResultString("Track", j) == toString(seed_tracks[i])) {
+			if (getResultString("Track", j) == toString(mother_tracks[i])) {
 				s_array = Array.concat(s_array, (getResult(column,j)));
 			}
 		}
@@ -1055,17 +1307,17 @@ print("Seed tracks aligned for "+column);
 	}
 
 //get the daughter track numbers
-	daughter_tracks = list_no_repeats_filter("Results", "Track", "Seed", 0);
+	daughter_tracks = list_no_repeats_filter("Results", "Track", "Mother?", 0);
 	d_length = 0;
 //get the length of the longest track
 	for (i=0; i<nResults; i++) {
-		if ((getResult("Seed",i) == 0) && (getResult("T_Length",i)>d_length)) {
+		if ((getResult("Mother?",i) == 0) && (getResult("T_Length",i)>d_length)) {
 			d_length = getResult("T_Length",i);
 		}
 	}
 	print("Daughter tracks aligned for "+column);
 
-//write each track to the log followed by zero entries upto dlength
+//write each track to the log followed by zero entries up to d_length
 	for (i=0; i<daughter_tracks.length; i++) {
 		d_array = newArray();
 		for (j=0; j<nResults; j++) {
@@ -1081,4 +1333,200 @@ print("Seed tracks aligned for "+column);
 	}
 }
 
+// return order:
+// [0] area
+// [1] feret
+// [2] circ
+// [3] com_x
+// [4] com_y
+// [5] nucMean (channel 2)
+// [6] cytoMean (channel 2)
+// [7] cnRatio (cytoMean / nucMean)
+function get_cell_properties(x, y) {
+    // Remember original image
+    originalTitle = getTitle();
+    selectWindow(originalTitle);
+
+    // --- SEGMENTATION on nuclear channel (C1) ---
+    Stack.setChannel(1);
+    run("Select None");
+    run("Duplicate...", "title=__seg__");
+
+    // Work on the segmentation copy
+    selectWindow("__seg__");
+    run("Auto Threshold", "method=Default white stack");
+    run("BinaryFilterReconstruct ", "erosions=1 white");
+
+    // Select nucleus region around the clicked point
+    doWand(x, y);
+
+    // --- Measurements on reporter channel (C2) via redirect ---
+    // Make sure original is on C2 for intensity
+    selectWindow(originalTitle);
+    Stack.setChannel(2);
+
+    // Set measurements to be redirected to the original image (C2)
+    selectWindow("__seg__");
+    run(
+        "Set Measurements...",
+        "area feret's shape center mean redirect=[" + originalTitle + "] decimal=4"
+    );
+
+    // Clear generic Results table (tracking table has a different name)
+    if (isOpen("Results")) {
+        selectWindow("Results");
+        run("Clear Results");
+    }
+
+    // Nuclear measurement
+    run("Measure");
+    area    = getResult("Area", 0);
+    feret   = getResult("Feret", 0);
+    circ    = getResult("Circ.", 0);
+    com_x   = getResult("XM", 0);
+    com_y   = getResult("YM", 0);
+    nucMean = getResult("Mean", 0);
+
+    // --- CYTOPLASMIC BAND around nucleus ---
+    run("Enlarge...", "enlarge=2"); // so selections don't touch
+    run("Make Band...", "band=" + bandWidth);
+    run("Measure");
+    cytoMean = getResult("Mean", 1);
+
+    // Grab band coordinates to bring back to original as ROI
+    getSelectionCoordinates(bx, by);
+
+    // C/N ratio
+    if (cytoMean == 0) {
+        ncRatio = NaN;
+    } else {
+        ncRatio = cytoMean / nucMean;
+    }
+
+    // --- CLEAN UP SEG IMAGE SAFELY ---
+    if (isOpen("__seg__")) {
+        selectWindow("__seg__");
+        run("Close");
+    }
+
+    // --- DRAW THE BAND OUTLINE ON THE ORIGINAL IMAGE ---
+    if (isOpen(originalTitle)) {
+        selectWindow(originalTitle);
+        run("Select None");
+        makeSelection("polygon", bx, by);  // visible marker
+    }
+
+    // Return shape + COM + N/C info
+    return newArray(area, feret, circ, com_x, com_y, nucMean, cytoMean, ncRatio);
+}
+
+function convert_to_mdf2(){
+
+//get the track numbers in an array to use as the index
+	track_number = list_no_repeats ("Results", "Track");
+	mothers_and_daughters = newArray();
+	
+	for (i = 0; i < track_number.length; i++) {
+		track_string = track_number[i];
+		len = track_string.length;
+		key = substring(track_string,len-1);
+	
+		if (key == "a" || key== "b") {
+			mothers_and_daughters = Array.concat(mothers_and_daughters,0);
+			} else {
+			mothers_and_daughters = Array.concat(mothers_and_daughters,1);
+			}
+	}
+	
+//close the log
+	if (isOpen("Log")) {
+		selectWindow("Log");
+		run("Close");
+	}
+	
+	print("MTrackJ 1.2.0 Data File");
+	print("Assembly 1");
+
+//write the mothers to cluster 1
+
+	print("Cluster 1 (Mothers)");
+
+	for (i=0; i<track_number.length; i++){
+		if (mothers_and_daughters[i]==1) {
+			print("Track "+i+1);
+		}
+		count=0;
+		for (j=0; j<nResults; j++) {
+			
+			if ((getResultString("Track", j) == track_number[i])&&(getResult("Mother?", j)==1)){
+				count = count+1;
+
+				x = getResult("X", j);
+				y = getResult("Y", j);
+				z =	1;
+				t = getResult("Frame", j);
+				c = 1;
+				ch1 = getResult("Ch1_Mean", j);
+				ch2 = getResult("Ch2_Mean", j);
+				ch3 = getResult("Ch3_Mean", j);
+				ch4 = getResult("Ch4_Mean", j);
+				ch5 = getResult("Ch5_Mean", j);
+						
+				print("Point "+count+" "+x+" "+y+" "+z+" "+t+" "+c+" "+ch1+" "+ch2+" "+ch3+" "+ch4);
+				}
+			}
+		}
+		
+//write the daughters to cluster 2
+
+	print("Cluster 2 (Progeny)");
+
+	for (i=0; i<track_number.length; i++){
+		if (mothers_and_daughters[i]==0) {
+			print("Track "+i+1);
+		}
+		count=0;
+		for (j=0; j<nResults; j++) {
+		
+			if ((getResultString("Track", j) == track_number[i])&&(getResult("Mother?", j)==0)){
+				count = count+1;
+
+				x = getResult("X", j);
+				y = getResult("Y", j);
+				z =	1;
+				t = getResult("Frame", j);
+				c = 1;
+				ch1 = getResult("Ch1_Mean", j);
+				ch2 = getResult("Ch2_Mean", j);
+				ch3 = getResult("Ch3_Mean", j);
+				ch4 = getResult("Ch4_Mean", j);
+				ch5 = getResult("Ch5_Mean", j);
+			
+				print("Point "+count+" "+x+" "+y+" "+z+" "+t+" "+c+" "+ch1+" "+ch2+" "+ch3+" "+ch4);
+				}
+			}
+		}
+		
+	print("End of MTrackJ Data File");
+}
+
+function correct_xy(imgTitle, x, y) {
+	
+	//make roi
+	selectWindow(imgTitle);
+	drawOval(x,y,20,20);
+	getRawStatistics(nPixels, mean, min, max);
+	run("Find Maxima...", "noise="+max+" output=[Point Selection]");
+    	
+    	// Get coordinates of maxima point selection
+    	getSelectionBounds(x, y, w, h);
+
+    	// Return corrected coordinates
+    	corrected_xy = newArray(x, y);
+    	return corrected_xy;
+}
+
+
+
 //Icons used courtesy of: http://www.famfamfam.com/lab/icons/silk/
+//https://github.com/markjames/famfamfam-silk-icons
