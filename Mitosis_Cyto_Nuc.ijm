@@ -60,7 +60,7 @@ var sample = 5;
 var dir = "";
 var tdir = getDirectory("temp");
 
-// --- NEW: N/C-related globals ---
+//Global variables for measuring nuclear to cytoplasmic ratio
 var bandWidth = 3;      // thickness of cytoplasmic band in pixels
 var nuc_mean = NaN;     // nuclear mean intensity
 var cyto_mean = NaN;    // cytoplasmic band mean intensity
@@ -75,17 +75,17 @@ var dCmds = newMenu("Data Operations Menu Tool", newArray("Add Summary Stats", "
 macro "Initialize Action Tool - CeefD25D4cD52Dd6CdddD18CfffD00D01D02D03D0cD0dD0eD0fD10D11D1eD1fD20D27D28D2fD30D35D3aD3fD44D4bD53D5cD72D82Da3DacDb4DbbDc0Dc5DcaDcfDd0Dd7DdfDe0De1DeeDefDf0Df1Df2Df3DfcDfdDfeDffCcccDd4CfffD26D39D62D7dD92Db3Dc4Dc6Dd8CdefD22D2dDd2DddCaaaDe7CeffD04D0bD29D37D38D40D45D4fD54D55D64D6cD73D7bD83D8aD8dD99D9cDa8Db0DbfDc9Df4DfbCdefD5bD6aD6bDa9Db7Db8CcdfD14D41Db1CfffD12D1dD21D2eD34D36D43D63D93Dd1DdeDe2DedCdefD05D0aD13D1cD31D3eD50D5fDa0DafDc1DceDe3DecDf5DfaC58cD97CeefD46D47D56D65D84CdeeD9dCbdfDebCbcdDadCeefD49D4aD58D59D5aD67D68D69D6dD7cD8cDa5Da6Db5Db6Dc7Dc8CcefD06D09D60D6fD90D9fDf6Df9C58cD75D76D77D78D79D86D87D88CeefD48D57D66D94D95Da4CddeD24D42Dd5CcdeD3dCbbcD3cDe6C9aaDbdCeeeD2aCbdfD07D08D70D7fD80D8fDf7Df8CaceD96CeffD3bCdddD71CccdDe5CabbDe9C999D7eD8eCdefD8bD9aD9bDaaDabDb9DbaCcdfD1bDe4CbcdDcdDdcCddeD15D51CcdeD1aDa1Dc2Dd3CbbdDaeCaabD9eDdbCeeeDa2CbdeDa7DbeCdddD17D19D81CccdDc3CaabD6eC9aaDccCdefD23D32CcdfD4eCbcdDdaCcdeD2cCaaaDe8CbceD74D85CddeD16D33D61D91CcddD5dDb2CbbbD4dCbcdD5eDeaCdeeDbcDcbDd9CccdD2b"
 {
     
-    // Check if image is multi-channel
+// Check if image is multi-channel
     getDimensions(width, height, channels, slices, frames);
     
     if (channels < 2) {
         exit("This macro requires a multi-channel image. Current image has only " + channels + " channel(s).");
     }
     
-    // Must be set up for black background
+ // Must be set up for black background
     run("Options...", "iterations=1 count=1 black edm=Overwrite do=Nothing");
 
-    // Remove scale if any
+ // Remove scale if any
     run("Set Scale...", "distance=0 known=0 pixel=1 unit=pixel");
     run("Remove Overlay");
 
@@ -102,22 +102,22 @@ macro "Initialize Action Tool - CeefD25D4cD52Dd6CdddD18CfffD00D01D02D03D0cD0dD0e
 
     getDimensions(width, height, channels, slices, frames);
     
-    // Display as composite to see both channels
+ // Display as composite to see both channels
     Stack.setDisplayMode("composite");
     
-    // Set C1 (nuclear) to red and C2 (signal) to green for visualization
+ // Set C1 (nuclear) to red and C2 (signal) to green for visualization
     Stack.setChannel(1);
     run("Red");
     Stack.setChannel(2);
     run("Green");
     
-    // Enhance contrast for better visualization
+ // Enhance contrast for better visualization
     Stack.setChannel(1);
     run("Enhance Contrast", "saturated=0.35");
     Stack.setChannel(2);
     run("Enhance Contrast", "saturated=0.35");
 
-    // Prompt for calibration of image
+ // Prompt for calibration of image
     Dialog.create("Please set calibration values");
     Dialog.addNumber("Time Step (min):", 2);
     Dialog.addNumber("Scale (um/px):", 0.619);
@@ -318,7 +318,7 @@ if (track_roi == true) {
 
 macro "Manual Track Tool - CfffD00D01D02D03D04D05D06D07D0bD0cD0dD0eD0fD10D11D12D13D14D15D16D17D19D1bD1cD1dD1eD1fD20D21D22D23D24D25D26D2bD2cD2dD2eD2fD30D31D32D33D34D39D3aD3bD3cD3dD3eD3fD40D41D42D43D50D51D52D53D60D61D62D68D69D6aD70D71D77D78D79D7aD7bD7cD7dD84D87D88D89D8aD8bD8cD8dD8eD8fD91D93D94D97D98D99D9aD9bD9cD9dD9eD9fDa3Da4Da7Da8Da9DaaDabDacDadDaeDafDb0Db1Db2Db3Db4Db8Db9DbaDbbDbcDbdDbeDbfDc0Dc1Dc2Dc3Dc4Dc9DcaDcbDccDcdDceDcfDd0Dd1Dd2Dd3Dd4Dd9DdaDdbDdcDddDdeDdfDe0De1De2De3De4De5DeaDebDecDedDeeDefDf0Df1Df2Df3Df4Df5DfbDfcDfdDfeDffC48dD4dD6cDc8Dd7Dd8De6De7Df6C37dD7fDfaC69eDa5C777D45C58dD6dDc6Dd5C999D27D36D37D38D54D63D64D72D73D74D83C8beD5eD75C48dD6bDb7Dc7Dd6C48dD4eDf7C8aeD49D4aD58D59C888D28D46D55D82C59eD96Db6C9beD57C47dD4fD7eDe8De9Df8Df9C7aeD5fD6fC59dDb5Dc5C8beD5aD66C69dD47D65C69eD76D86Da6C9beD5bD5cD5dD85C7aeD48D4bC59eD4cC59dD67C8beD95C6aeD6e"
 {
-    // some variables
+// some variables
     dist = 0;
     track = toString(gtrack) + toString(daughter);
     slice = getSliceNumber(); 
@@ -328,7 +328,7 @@ macro "Manual Track Tool - CfffD00D01D02D03D04D05D06D07D0bD0cD0dD0eD0fD10D11D12D
     cell_feret = 0;
     cell_circ  = 0;
 
-    // draw / open tracking table
+// draw / open tracking table
     requires("1.41g");
     title1 = image + "_Tracking Table";
     title2 = "[" + title1 + "]";
@@ -349,7 +349,7 @@ macro "Manual Track Tool - CfffD00D01D02D03D04D05D06D07D0bD0cD0dD0eD0fD10D11D12D
 
     setBatchMode(true);
 
-    // nearest distance to skeleton if ROI tracking is enabled
+// nearest distance to skeleton if ROI tracking is enabled
     if (track_roi == true) {
         posx = x;
         posy = y;
@@ -357,25 +357,25 @@ macro "Manual Track Tool - CfffD00D01D02D03D04D05D06D07D0bD0cD0dD0eD0fD10D11D12D
         dist = shortest;
     }
 
-    // --- get morphology + N/C values ---
+// get morphology + N/C values
     morphology_values = newArray();
     morphology_values = get_cell_properties(x, y);
 
-    // shape
+// shape
     cell_area  = morphology_values[0];
     cell_feret = morphology_values[1];
     cell_circ  = morphology_values[2];
 
-    // centre of mass 
+// centre of mass 
     com_x = morphology_values[3];
     com_y = morphology_values[4];
 
-    // nuclear / cytoplasmic intensities
+// nuclear / cytoplasmic intensities
     nuc_mean  = morphology_values[5];
     cyto_mean = morphology_values[6];
     nc_ratio  = morphology_values[7];
 
-    // Clear generic Results window if open (tracking table is a different window)
+// Clear generic Results window if open (tracking table is a different window)
     if (isOpen("Results")) {
         selectWindow("Results");
         run("Close");
@@ -383,7 +383,7 @@ macro "Manual Track Tool - CfffD00D01D02D03D04D05D06D07D0bD0cD0dD0eD0fD10D11D12D
 
     setBatchMode(false);
 
-    // is the xy position within the tracked ROI at this time point?
+// is the xy position within the tracked ROI at this time point?
     inside = "No";
     if (track_roi == true) {
         for (i = 0; i < x_values.length; i++) {
@@ -393,7 +393,7 @@ macro "Manual Track Tool - CfffD00D01D02D03D04D05D06D07D0bD0cD0dD0eD0fD10D11D12D
         }
     }
 
-    // --- Print one row to the tracking table ---
+// Print one row to the tracking table
     print(f,
         (number++) + "\t" +
         image + "\t" +
@@ -415,7 +415,7 @@ macro "Manual Track Tool - CfffD00D01D02D03D04D05D06D07D0bD0cD0dD0eD0fD10D11D12D
         nc_ratio
     );
 
-    // last_line: keep original format (no N/C) so mitosis logic stays unchanged
+// last_line: keep original format (no N/C) so mitosis logic stays unchanged
     last_line =
         "" + (slice) + "\t" + "1" + "\t" + "1" + "\t" +
         (com_x) + "\t" + (com_y) + "\t" +
@@ -423,15 +423,15 @@ macro "Manual Track Tool - CfffD00D01D02D03D04D05D06D07D0bD0cD0dD0eD0fD10D11D12D
         dist + "\t" + inside + "\t" +
         cell_area + "\t" + cell_feret + "\t" + cell_circ;
 
-    // --- advance to next time point / slice in a robust way ---
+// Advance to next time point / slice in a robust way
     selectWindow(image);
 
-    // get stack dimensions and current position
+// get stack dimensions and current position
     Stack.getDimensions(w, h, ch, sl, fr);
     Stack.getPosition(c, s, t);
 
-    // If it’s a pure time-series hyperstack (frames > 1, single slice),
-    // step in time. Otherwise, step in slices.
+// If it’s a pure time-series hyperstack (frames > 1, single slice),
+// step in time. Otherwise, step in slices.
     if (fr > 1 && sl == 1) {
         if (t < fr)
             Stack.setPosition(c, s, t + 1);
@@ -583,26 +583,26 @@ macro "Reanalyze Action Tool - Cad8DccCd54D9bCed8D88C676DdfC7adDd2Cbc5D99CefeD1c
 
         setSlice(old_frames[i]);
 
-        // 1) Measure at original (x0,y0)
+// 1) Measure at original (x0,y0)
         morphology_values = get_cell_properties(x, y);
         area  = morphology_values[0];
 
-        // 2) Only correct if initial area > 5000
+// 2) Only correct if initial area > 5000
         if (area > 5000) {
             corrected_xy = correct_xy(imgTitle, x, y);
             x1 = corrected_xy[0];
             y1 = corrected_xy[1];
 
-            // re-measure after correction
+// re-measure after correction
             morphology_values = get_cell_properties(x1, y1);
             area  = morphology_values[0];
 
-            // set to corrected coords for any kept outputs
+// set to corrected coords for any kept outputs
             x = x1;
             y = y1;
         }
 
-        // 3) If still > 5000 after (optional) correction, skip this datapoint
+// 3) If still > 5000 after (optional) correction, skip this datapoint
         if (area > 5000) {
             new_areas = Array.concat(new_areas, "NaN");
             new_feret = Array.concat(new_feret, "NaN");
@@ -610,7 +610,7 @@ macro "Reanalyze Action Tool - Cad8DccCd54D9bCed8D88C676DdfC7adDd2Cbc5D99CefeD1c
             new_com_x = Array.concat(new_com_x, "NaN");
             new_com_y = Array.concat(new_com_y, "NaN");
         } else {
-            // keep: append measurements and COM, remember original row index
+// keep: append measurements and COM, remember original row index
             new_areas = Array.concat(new_areas, morphology_values[0]);
             new_feret = Array.concat(new_feret, morphology_values[1]);
             new_circs = Array.concat(new_circs, morphology_values[2]);
@@ -1342,43 +1342,41 @@ print("Mother tracks aligned for "+column);
 // [5] nucMean (channel 2)
 // [6] cytoMean (channel 2)
 // [7] cnRatio (cytoMean / nucMean)
+
 function get_cell_properties(x, y) {
-    // Remember original image
+// Remember original image
     originalTitle = getTitle();
     selectWindow(originalTitle);
 
-    // --- SEGMENTATION on nuclear channel (C1) ---
+// SEGMENTATION on nuclear channel (C1)
     Stack.setChannel(1);
     run("Select None");
     run("Duplicate...", "title=__seg__");
 
-    // Work on the segmentation copy
+// Work on the segmentation copy
     selectWindow("__seg__");
     run("Auto Threshold", "method=Default white stack");
     run("BinaryFilterReconstruct ", "erosions=1 white");
 
-    // Select nucleus region around the clicked point
+// Select nucleus region around the clicked point
     doWand(x, y);
 
-    // --- Measurements on reporter channel (C2) via redirect ---
-    // Make sure original is on C2 for intensity
+// Measurements on reporter channel (C2) via redirect
+// Make sure original is on C2 for intensity
     selectWindow(originalTitle);
     Stack.setChannel(2);
 
-    // Set measurements to be redirected to the original image (C2)
+// Set measurements to be redirected to the original image (C2)
     selectWindow("__seg__");
-    run(
-        "Set Measurements...",
-        "area feret's shape center mean redirect=[" + originalTitle + "] decimal=4"
-    );
+    run("Set Measurements...", "area feret's shape center mean redirect=[" + originalTitle + "] decimal=4");
 
-    // Clear generic Results table (tracking table has a different name)
+// Clear generic Results table (tracking table has a different name)
     if (isOpen("Results")) {
         selectWindow("Results");
         run("Clear Results");
     }
 
-    // Nuclear measurement
+// Nuclear measurement
     run("Measure");
     area    = getResult("Area", 0);
     feret   = getResult("Feret", 0);
@@ -1387,36 +1385,36 @@ function get_cell_properties(x, y) {
     com_y   = getResult("YM", 0);
     nucMean = getResult("Mean", 0);
 
-    // --- CYTOPLASMIC BAND around nucleus ---
+// CYTOPLASMIC BAND around nucleus
     run("Enlarge...", "enlarge=2"); // so selections don't touch
     run("Make Band...", "band=" + bandWidth);
     run("Measure");
     cytoMean = getResult("Mean", 1);
 
-    // Grab band coordinates to bring back to original as ROI
+// Grab band coordinates to bring back to original as ROI
     getSelectionCoordinates(bx, by);
 
-    // C/N ratio
+// C/N ratio
     if (cytoMean == 0) {
         ncRatio = NaN;
     } else {
         ncRatio = cytoMean / nucMean;
     }
 
-    // --- CLEAN UP SEG IMAGE SAFELY ---
+// CLEAN UP SEG IMAGE SAFELY
     if (isOpen("__seg__")) {
         selectWindow("__seg__");
         run("Close");
     }
 
-    // --- DRAW THE BAND OUTLINE ON THE ORIGINAL IMAGE ---
+// DRAW THE BAND OUTLINE ON THE ORIGINAL IMAGE
     if (isOpen(originalTitle)) {
         selectWindow(originalTitle);
         run("Select None");
         makeSelection("polygon", bx, by);  // visible marker
     }
 
-    // Return shape + COM + N/C info
+// Return shape + COM + N/C info
     return newArray(area, feret, circ, com_x, com_y, nucMean, cytoMean, ncRatio);
 }
 
@@ -1512,21 +1510,19 @@ function convert_to_mdf2(){
 
 function correct_xy(imgTitle, x, y) {
 	
-	//make roi
+//make roi
 	selectWindow(imgTitle);
 	drawOval(x,y,20,20);
 	getRawStatistics(nPixels, mean, min, max);
 	run("Find Maxima...", "noise="+max+" output=[Point Selection]");
     	
-    	// Get coordinates of maxima point selection
+// Get coordinates of maxima point selection
     	getSelectionBounds(x, y, w, h);
 
-    	// Return corrected coordinates
+// Return corrected coordinates
     	corrected_xy = newArray(x, y);
     	return corrected_xy;
 }
-
-
 
 //Icons used courtesy of: http://www.famfamfam.com/lab/icons/silk/
 //https://github.com/markjames/famfamfam-silk-icons
