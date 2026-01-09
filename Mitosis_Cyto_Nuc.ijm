@@ -41,24 +41,24 @@ var time_step = 10;    // this is the image acquisition rate in minutes
 var cal = 0.619;       // this is the resolution of the image in micron/px
 
 //Global variables for ROI tracking
-var track_roi = false;
-var shortest = 100000;
-var xpoints = newArray(); // the extent of the ROI
-var ypoints = newArray(); // the extent of the ROI
+//var track_roi = false;
+//var shortest = 100000;
+//var xpoints = newArray(); // the extent of the ROI
+//var ypoints = newArray(); // the extent of the ROI
 
-var f = "";
+//var f = "";
 
-var count = 1;
+//var count = 1;
 var image = "";         // image title (was 'Image' – avoid conflict with ImageJ keyword)
-var x_values = newArray();
-var y_values = newArray();
-var roi_n = 0;
-var com_roi_x = 0; 
-var com_roi_y = 0; 
+//var x_values = newArray();
+//var y_values = newArray();
+//var roi_n = 0;
+//var com_roi_x = 0; 
+//var com_roi_y = 0; 
 
-var sample = 5;
-var dir = "";
-var tdir = getDirectory("temp");
+//var sample = 5;
+//var dir = "";
+//var tdir = getDirectory("temp");
 
 //Global variables for measuring nuclear to cytoplasmic ratio
 var bandWidth = 3;      // thickness of cytoplasmic band in pixels
@@ -82,10 +82,10 @@ macro "Initialize Action Tool - CeefD25D4cD52Dd6CdddD18CfffD00D01D02D03D0cD0dD0e
         exit("This macro requires a multi-channel image. Current image has only " + channels + " channel(s).");
     }
     
- // Must be set up for black background
+// Must be set up for black background
     run("Options...", "iterations=1 count=1 black edm=Overwrite do=Nothing");
 
- // Remove scale if any
+// Remove scale if any
     run("Set Scale...", "distance=0 known=0 pixel=1 unit=pixel");
     run("Remove Overlay");
 
@@ -102,218 +102,34 @@ macro "Initialize Action Tool - CeefD25D4cD52Dd6CdddD18CfffD00D01D02D03D0cD0dD0e
 
     getDimensions(width, height, channels, slices, frames);
     
- // Display as composite to see both channels
+// Display as composite to see both channels
     Stack.setDisplayMode("composite");
     
- // Set C1 (nuclear) to red and C2 (signal) to green for visualization
+// Set C1 (nuclear) to red and C2 (signal) to green for visualization
     Stack.setChannel(1);
     run("Red");
     Stack.setChannel(2);
     run("Green");
     
- // Enhance contrast for better visualization
+// Enhance contrast for better visualization
     Stack.setChannel(1);
     run("Enhance Contrast", "saturated=0.35");
     Stack.setChannel(2);
     run("Enhance Contrast", "saturated=0.35");
 
- // Prompt for calibration of image
+// Prompt for calibration of image
     Dialog.create("Please set calibration values");
     Dialog.addNumber("Time Step (min):", 2);
     Dialog.addNumber("Scale (um/px):", 0.619);
     Dialog.addNumber("Cytoplasmic band width (pixels):", 5);
-    Dialog.addCheckbox("Find random cells?", false);
-    Dialog.addNumber("Number of random cells:", 5);
-    Dialog.addCheckbox("Track ROI?", false);
     Dialog.show();
     time_step = Dialog.getNumber();
     cal = Dialog.getNumber();
     bandWidth = Dialog.getNumber();  // Make this a global variable
-    rcells = Dialog.getChoice();
-    sample = Dialog.getNumber();
-    track_roi = Dialog.getChoice();
-
-if (track_roi == true) {
-
-//Prompt user to define the hair follicle targetROI in the final frame
-		run("Colors...", "foreground=white background=black selection=red");
-		setSlice(slices);
-		run("Select None");
-		setTool("oval");
-		waitForUser("Select ROI", "Please outline the target ROI and press OK");
-
-//Only if ROI tracking is ticked//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-//save snapshots frame 1 and last
-		run("Select None");
-		setSlice(1);
-		run("Duplicate...", " ");
-		run("Restore Selection");
-		run("RGB Color");
-		run("Colors...", "foreground=red background=red selection=red");
-		run("Draw");
-		run("Select None");
-		saveAs("Tiff", dir+image+"_ROI_First.tif");
-		run("Close");
-		run("Select None");
-		setSlice(slices);
-		run("Duplicate...", " ");
-		run("Restore Selection");
-		run("RGB Color");
-		run("Colors...", "foreground=red background=red selection=red");
-		run("Draw");
-		run("Select None");
-		saveAs("Tiff", dir+image+"_ROI_Last.tif");
-		run("Close");
-
-//get the skeleton of the target ROI
-		selectWindow(image);
-		run("Restore Selection");
-
-		if (isOpen("Results")){
-			selectWindow("Results");
-			run("Close");
-		}
-
-//get all the x and y positions of the pixels in the selection 
-		getSelectionBounds(x0, y0, width, height); 
-
-		for (y=y0; y<y0+height; y++) {
-  			for (x=x0; x<x0+width; x++) { 
-    			if (selectionContains(x, y)){ 
-   		  			x_values = Array.concat(x_values, x);
-   		  			y_values = Array.concat(y_values, y);
-   		  		}
-  			} 
-		}	
-
-		get_skel_xy(image);
-
-//add to the saved images
-		open(dir+image+"_ROI_First.tif");
-		run("Restore Selection");
-		run("Colors...", "foreground=yellow background=black selection=red");
-		run("Draw");
-		run("Select None");
-		saveAs("Tiff", dir+image+"_ROI_First.tif");
-		run("Close");
-
-		open(dir+image+"_ROI_Last.tif");
-		run("Restore Selection");
-		run("Colors...", "foreground=yellow background=black selection=red");
-		run("Draw");
-		run("Select None");
-		saveAs("Tiff", dir+image+"_ROI_Last.tif");
-		run("Close");
-
-//save log of coordinates
-		print("X Values");
-		Array.print(x_values);
-		print("Y Values");
-		Array.print(y_values);
-		selectWindow("Log");
-		saveAs("Text", dir+image+"Selection_Coordinates.txt");
-
-		if (isOpen("Log")){
-			selectWindow("Log");
-			run("Close");
-		}
-
-}
-
-//Only if ROI tracking is ticked//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	if (rcells == true) {
-	//add all cells to the manager in order to choose random cells
-
-		if (isOpen("ROI Manager")){
-			selectWindow("ROI Manager");
-			run("Close");
-		}
-
-		run("Select None");
-		setSlice(1);
-		run("Select All");
-		run("Copy");
-		run("Select None");
-		run("Internal Clipboard");
-		run("8-bit");
-		run("Gaussian Blur...", "sigma=1");
-		run("Find Maxima...", "noise=15 output=[Point Selection]");
-		getDimensions(width, height, channels, slices, frames);
-
-		newImage("Untitled", "8-bit black", width, height, 1);
-		run("Colors...", "foreground=white background=black selection=cyan");
-		run("Restore Selection");
-		run("Draw");
-		run("Make Binary");
-		run("Analyze Particles...", "exclude add");
-
-		selectWindow(image);
-		roiManager("Show All");
-
-		if (isOpen("Clipboard")){
-			selectWindow("Clipboard");
-			run("Close");
-		}
-
-		if (isOpen("Untitled")){
-			selectWindow("Untitled");
-			run("Close");
-		}
-
-//randomly select 20 ROIS
-		run("Set Measurements...", "center redirect=None decimal=4");
-		roiManager("Select All");
-		roiManager("Measure");
-
-//make sure there are enough ROIS in the manager
-		cells = roiManager("count");
-
-		if (sample > cells) {sample = cells;} else {}
-
-
-		if (isOpen("ROI Manager")) {
-   		 	selectWindow("ROI Manager");
-   		 	run("Close");
-		}
-
-		k=0; 
-		n=nResults(); 
-		rois=newArray(n); 
-
-		for(i=0;i<n;i++) {
-   		 	rois[i]=k++;
-		} 
-
-//need to check that if there are less than roi_n cells it just selects all
-		myFisherYates(rois); 
-
-		count=1; 
-		for(i=0;i<sample;i++) { 
-    		x = getResult("XM", rois[i]); 
-    		y = getResult("YM", rois[i]); 
-   		 	makePoint(x, y);
-   		 	roiManager("Add");  
-  	 } 
-
-		if (isOpen("Results")) {
-    		selectWindow("Results");
-    		run("Close");
-		}
-
-		selectWindow(image);
-		roiManager("Show None");
-
-		roiManager("Select", roi_n);
-		run("Enlarge...", "enlarge=10");
-	}
-	run("Select None");
-	setSlice(1);
-
-	run("Colors...", "foreground=white background=white selection=cyan");
+    
+    run("Select None");
+    setSlice(1);
+    run("Colors...", "foreground=white background=white selection=cyan");
 }
 
 macro "Manual Track Tool - CfffD00D01D02D03D04D05D06D07D0bD0cD0dD0eD0fD10D11D12D13D14D15D16D17D19D1bD1cD1dD1eD1fD20D21D22D23D24D25D26D2bD2cD2dD2eD2fD30D31D32D33D34D39D3aD3bD3cD3dD3eD3fD40D41D42D43D50D51D52D53D60D61D62D68D69D6aD70D71D77D78D79D7aD7bD7cD7dD84D87D88D89D8aD8bD8cD8dD8eD8fD91D93D94D97D98D99D9aD9bD9cD9dD9eD9fDa3Da4Da7Da8Da9DaaDabDacDadDaeDafDb0Db1Db2Db3Db4Db8Db9DbaDbbDbcDbdDbeDbfDc0Dc1Dc2Dc3Dc4Dc9DcaDcbDccDcdDceDcfDd0Dd1Dd2Dd3Dd4Dd9DdaDdbDdcDddDdeDdfDe0De1De2De3De4De5DeaDebDecDedDeeDefDf0Df1Df2Df3Df4Df5DfbDfcDfdDfeDffC48dD4dD6cDc8Dd7Dd8De6De7Df6C37dD7fDfaC69eDa5C777D45C58dD6dDc6Dd5C999D27D36D37D38D54D63D64D72D73D74D83C8beD5eD75C48dD6bDb7Dc7Dd6C48dD4eDf7C8aeD49D4aD58D59C888D28D46D55D82C59eD96Db6C9beD57C47dD4fD7eDe8De9Df8Df9C7aeD5fD6fC59dDb5Dc5C8beD5aD66C69dD47D65C69eD76D86Da6C9beD5bD5cD5dD85C7aeD48D4bC59eD4cC59dD67C8beD95C6aeD6e"
@@ -336,7 +152,7 @@ macro "Manual Track Tool - CfffD00D01D02D03D04D05D06D07D0bD0cD0dD0eD0fD10D11D12D
 
     if (!isOpen(title1)) {
         run("Table...", "name=" + title2 + " width=1000 height=300");
-        print(f, "\\Headings: \tImage_ID\tTrack\tMother?\tFrame\tSlice\tCh\tX\tY\tFollicle_COMX\tFollicle_COMY\tDistance_from_COM_(um)\tInside?\tArea\tFeret\tCirc.\tNuc_Mean\tCyto_Mean\tNC_Ratio");
+        print(f, "\\Headings: \tImage_ID\tTrack\tMother?\tFrame\tSlice\tCh\tX\tY\tArea\tFeret\tCirc.\tNuc_Mean\tCyto_Mean\tNC_Ratio");
     }
 
     autoUpdate(false);
@@ -348,14 +164,6 @@ macro "Manual Track Tool - CfffD00D01D02D03D04D05D06D07D0bD0cD0dD0eD0fD10D11D12D
     run("Enlarge...", "enlarge=5");
 
     setBatchMode(true);
-
-// nearest distance to skeleton if ROI tracking is enabled
-    if (track_roi == true) {
-        posx = x;
-        posy = y;
-        get_s_dist(x, y, xpoints, ypoints, cal);
-        dist = shortest;
-    }
 
 // get morphology + N/C values
     morphology_values = newArray();
@@ -383,16 +191,6 @@ macro "Manual Track Tool - CfffD00D01D02D03D04D05D06D07D0bD0cD0dD0eD0fD10D11D12D
 
     setBatchMode(false);
 
-// is the xy position within the tracked ROI at this time point?
-    inside = "No";
-    if (track_roi == true) {
-        for (i = 0; i < x_values.length; i++) {
-            if ((x == x_values[i]) && (y == y_values[i])) {
-                inside = "Yes";
-            }
-        }
-    }
-
 // Print one row to the tracking table
     print(f,
         (number++) + "\t" +
@@ -403,10 +201,6 @@ macro "Manual Track Tool - CfffD00D01D02D03D04D05D06D07D0bD0cD0dD0eD0fD10D11D12D
         "1\t1\t" +
         (com_x) + "\t" +
         (com_y) + "\t" +
-        (com_roi_x) + "\t" +
-        (com_roi_y) + "\t" +
-        dist + "\t" +
-        inside + "\t" +
         cell_area + "\t" +
         cell_feret + "\t" +
         cell_circ + "\t" +
@@ -416,12 +210,7 @@ macro "Manual Track Tool - CfffD00D01D02D03D04D05D06D07D0bD0cD0dD0eD0fD10D11D12D
     );
 
 // last_line: keep original format (no N/C) so mitosis logic stays unchanged
-    last_line =
-        "" + (slice) + "\t" + "1" + "\t" + "1" + "\t" +
-        (com_x) + "\t" + (com_y) + "\t" +
-        (com_roi_x) + "\t" + (com_roi_y) + "\t" +
-        dist + "\t" + inside + "\t" +
-        cell_area + "\t" + cell_feret + "\t" + cell_circ;
+    last_line = "" + (slice) + "\t" + "1" + "\t" + "1" + "\t" + (com_x) + "\t" + (com_y) + "\t" + cell_area + "\t" + cell_feret + "\t" + cell_circ;
 
 // Advance to next time point / slice in a robust way
     selectWindow(image);
@@ -544,7 +333,7 @@ macro "Reanalyze Action Tool - Cad8DccCd54D9bCed8D88C676DdfC7adDd2Cbc5D99CefeD1c
 //Create the output table only if it’s not already open
 	if (!isOpen(title1)) {
     		run("Table...", "name=" + title2 + " width=1000 height=300");
-    		print(f, "\\Headings:\tImage_ID\tTrack\tMother?\tFrame\tSlice\tCh\tX\tY\tOld_X\tOld_Y\tFollicle_COMX\tFollicle_COMY\tDistance_from_COM_(um)\tInside?\tArea\tFeret\tCirc.");
+    		print(f, "\\Headings:\tImage_ID\tTrack\tMother?\tFrame\tSlice\tCh\tX\tY\tOld_X\tOld_Y\tArea\tFeret\tCirc.\tNuc_Mean\tCyto_Mean\tNC_Ratio");
 	}
 
 //Store original x,y,frame values in arrays
@@ -690,7 +479,6 @@ macro "Data Operations Menu Tool - CfffD00D0eD0fD10D14D15D16D17D18D19D1aD1bD1cD1
 
 	else if (cmd=="Align Tracks") {
 		
-		align_data("Distance_from_COM_(um)");
 		align_data("Distance_(um)");
 		align_data("Speed_(um/min)");
 		align_data("Acc_Dist_(um)");
@@ -1464,13 +1252,8 @@ function convert_to_mdf2(){
 				z =	1;
 				t = getResult("Frame", j);
 				c = 1;
-				ch1 = getResult("Ch1_Mean", j);
-				ch2 = getResult("Ch2_Mean", j);
-				ch3 = getResult("Ch3_Mean", j);
-				ch4 = getResult("Ch4_Mean", j);
-				ch5 = getResult("Ch5_Mean", j);
 						
-				print("Point "+count+" "+x+" "+y+" "+z+" "+t+" "+c+" "+ch1+" "+ch2+" "+ch3+" "+ch4);
+				print("Point "+count+" "+x+" "+y+" "+z+" "+t+" "+c);
 				}
 			}
 		}
@@ -1494,13 +1277,8 @@ function convert_to_mdf2(){
 				z =	1;
 				t = getResult("Frame", j);
 				c = 1;
-				ch1 = getResult("Ch1_Mean", j);
-				ch2 = getResult("Ch2_Mean", j);
-				ch3 = getResult("Ch3_Mean", j);
-				ch4 = getResult("Ch4_Mean", j);
-				ch5 = getResult("Ch5_Mean", j);
 			
-				print("Point "+count+" "+x+" "+y+" "+z+" "+t+" "+c+" "+ch1+" "+ch2+" "+ch3+" "+ch4);
+				print("Point "+count+" "+x+" "+y+" "+z+" "+t+" "+c);
 				}
 			}
 		}
