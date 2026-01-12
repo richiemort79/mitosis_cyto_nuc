@@ -693,7 +693,7 @@ function per_track_summary() {
     }
     else {
 		run("New... ", "name="+title2+" type=Table width=250 height=600");
-		print(f, "\\Headings: \tTrack#\tLength (mins)\tAcc. Dist (um)\tEuc. Dist (um)\tPersistence\tAcc. Velocity (um/min)\tEuc. Velocity (um/min)\tClass\tStart Dist. COM (um)\tEnd Dist. COM (um)\tEntry Time (mins)");
+		print(f, "\\Headings: \tTrack#\tLength (mins)\tAcc. Dist (um)\tEuc. Dist (um)\tPersistence\tAcc. Velocity (um/min)\tEuc. Velocity (um/min)");
     }
 
 //get the track numbers in an array to use as the index
@@ -766,64 +766,6 @@ function per_track_summary() {
 		}
 	}
 
-//get the classes into an array
-	track_class = newArray();
-	var done = false; // used to prematurely terminate loop
-	for (i=0; i<track_number.length; i++){
-		done = false;
-		for (j=0; j<nResults && !done; j++) {
-		 	if (getResultString("Track", j) == toString(track_number[i])){
-		 		t_cl = getResultString("Class", j);
-		 		track_class = Array.concat(track_class, t_cl);
-		 		done = true; // break 
-		 	}
-		}
-	}
-
-//get initial distance from array for each track
-	var done1 = false; // used to prematurely terminate loop
-	dist_com = newArray();
-	for (i=0; i<track_number.length; i++){
-		done1 = false;
-		for (j=0; j<nResults && !done1; j++) {
-		 	if (getResultString("Track", j) == toString(track_number[i])){
-		 		comd = (getResult("Distance_from_COM_(um)", j));//removed calibration from here as it is now calibrated 060520
-		 		dist_com = Array.concat(dist_com, comd);
-		 		done1 = true; // break 
-		 	}
-		}
-	}
-
-//get final distance from array for each track
-	end_dist_com = newArray();
-	for (i=0; i<track_number.length; i++){
-		for (j=0; j<nResults; j++) {
-		 	if (getResultString("Track", j) == toString(track_number[i])){
-		 		comd = (getResult("Distance_from_COM_(um)", j));//removed calibration from here as it is now calibrated 060520
-		 	}	 	
-		}
-		end_dist_com = Array.concat(end_dist_com, comd);
-	}
-
-
-//get the follicle entry time using Inside and class, only generate a time if the class is No-Yes, gives first entry point
-//get class first in case not already done
-
-
-	var done1 = false; // used to prematurely terminate loop
-	entry_time = newArray();
-	for (i=0; i<track_number.length; i++){
-		done1 = false;
-		entry = NaN;
-		for (j=0; j<nResults && !done1; j++) {
-		 	if (getResultString("Track", j) == toString(track_number[i]) && getResultString("Inside?", j) == "Yes" && getResultString("Class", j) == "No-Yes"){
-		 		entry = getResult("Frame", j) * time_step;	
-		 		done1 = true; // break 
-		 	}
-		}
-		entry_time = Array.concat(entry_time, entry);
-	}
-
 //calculate persistence for track as euclidean/accumulated
 	track_persistence = newArray();
 	for (i=0; i<track_number.length; i++){
@@ -851,7 +793,7 @@ function per_track_summary() {
 			print("Track "+track_number[i]+" excluded < 10 steps");
 		} 
 			else {
-				print(f, (number++)+"\t"+toString(track_number[i])+"\t"+(track_lengths[i])+"\t"+(max_distances[i])+"\t"+(euclidean_distances[i])+"\t"+(track_persistence[i])+"\t"+(track_speed[i])+"\t"+(e_track_speed[i])+"\t"+track_class[i]+"\t"+(dist_com[i])+"\t"+(end_dist_com[i])+"\t"+(entry_time[i]));
+								print(f, (number++)+"\t"+toString(track_number[i])+"\t"+(track_lengths[i])+"\t"+(max_distances[i])+"\t"+(euclidean_distances[i])+"\t"+(track_persistence[i])+"\t"+(track_speed[i])+"\t"+(e_track_speed[i]));
   			}
 	}
 }
