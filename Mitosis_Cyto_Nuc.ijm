@@ -352,16 +352,36 @@ macro "Data Operations Menu Tool - CfffD00D0eD0fD10D14D15D16D17D18D19D1aD1bD1cD1
 
 	else if (cmd=="Align Tracks") {
 		
-		align_data("Distance_(um)");
-		align_data("Speed_(um/min)");
-		align_data("Acc_Dist_(um)");
-		align_data("Euclidean_D_(um)");
-		align_data("Persistence");
-		align_data("Area");
-		align_data("Feret");
-		align_data("Circ.");
-		align_data("NC_Ratio");
-		
+		if (isOpen("Results")) {
+			align_data("Distance_(um)");
+			align_data("Speed_(um/min)");
+			align_data("Acc_Dist_(um)");
+			align_data("Euclidean_D_(um)");
+			align_data("Persistence");
+			align_data("Area");
+			align_data("Feret");
+			align_data("Circ.");
+			align_data("NC_Ratio");
+		}	
+			else {
+				waitForUser("There is no Results table open please select a tracking table or press cancel");
+				table = getInfo("window.name");
+				selectWindow(table);
+				tdir = getDirectory("temp");
+				saveAs("Text", tdir+"Results.xls");
+				run("Close");
+				open(tdir+"Results.xls");
+				align_data("Distance_(um)");
+				align_data("Speed_(um/min)");
+				align_data("Acc_Dist_(um)");
+				align_data("Euclidean_D_(um)");
+				align_data("Persistence");
+				align_data("Area");
+				align_data("Feret");
+				align_data("Circ.");
+				align_data("NC_Ratio");
+			
+		}
 	}
 	
 }
