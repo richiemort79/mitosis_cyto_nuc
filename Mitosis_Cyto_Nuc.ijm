@@ -793,7 +793,7 @@ function per_track_summary() {
 			print("Track "+track_number[i]+" excluded < 10 steps");
 		} 
 			else {
-								print(f, (number++)+"\t"+toString(track_number[i])+"\t"+(track_lengths[i])+"\t"+(max_distances[i])+"\t"+(euclidean_distances[i])+"\t"+(track_persistence[i])+"\t"+(track_speed[i])+"\t"+(e_track_speed[i]));
+			print(f, (number++)+"\t"+toString(track_number[i])+"\t"+(track_lengths[i])+"\t"+(max_distances[i])+"\t"+(euclidean_distances[i])+"\t"+(track_persistence[i])+"\t"+(track_speed[i])+"\t"+(e_track_speed[i]));
   			}
 	}
 }
